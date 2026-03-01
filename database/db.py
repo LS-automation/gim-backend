@@ -1,3 +1,5 @@
+import json
+import os
 import gspread
 from google.oauth2.service_account import Credentials
 from config import GOOGLE_SHEET_ID
@@ -5,14 +7,19 @@ from config import GOOGLE_SHEET_ID
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 
-# ==============================
-# CONNECT TO GOOGLE SHEET
-# ==============================
 def connect_sheet():
-    creds = Credentials.from_service_account_file(
-        "database/credentials.json",
+    credentials_json = os.getenv("GOOGLE_CREDENTIALS")
+
+    if not credentials_json:
+        raise Exception("GOOGLE_CREDENTIALS not set")
+
+    credentials_dict = json.loads(credentials_json)
+
+    creds = Credentials.from_service_account_info(
+        credentials_dict,
         scopes=SCOPES
     )
+
     client = gspread.authorize(creds)
     return client.open_by_key(GOOGLE_SHEET_ID)
 
