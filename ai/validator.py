@@ -3,7 +3,15 @@ import json
 from config import GROQ_API_KEY
 
 
-def validate_with_ai(company, content):
+def validate_with_ai(company, title, snippet):
+
+    if not GROQ_API_KEY:
+        return {
+            "is_valid": False,
+            "event_type": "",
+            "confidence": 0.0,
+            "summary": ""
+        }
 
     prompt = f"""
 Return ONLY valid JSON.
@@ -26,7 +34,6 @@ Leadership Interview
 Tender
 
 STRICT RULES:
-
 1. Only mark relevant=true if this article announces a NEW, concrete company action.
 2. Ignore stock price commentary.
 3. Ignore analyst opinions.
@@ -37,7 +44,10 @@ STRICT RULES:
 8. If unsure → relevant=false.
 9. Do NOT guess.
 
-Article:
+Article Title: {title}
+
+Article Snippet:
+{snippet}
 """
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -47,7 +57,7 @@ Article:
         "messages": [
             {
                 "role": "user",
-                "content": prompt + content[:2000]
+                "content": prompt
             }
         ],
         "temperature": 0,
@@ -63,9 +73,22 @@ Article:
         response = requests.post(url, json=payload, headers=headers, timeout=20)
 
         if response.status_code == 200:
-            return json.loads(response.json()["choices"][0]["message"]["content"])
+            ai_response = response.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(ai_response)
+
+            return {
+                "is_valid": parsed.get("relevant", False),
+                "event_type": parsed.get("event_type", ""),
+                "confidence": parsed.get("confidence", 0.0),
+                "summary": parsed.get("summary", "")
+            }
 
     except Exception as e:
         print("Groq API error:", e)
 
-    return None
+    return {
+        "is_valid": False,
+        "event_type": "",
+        "confidence": 0.0,
+        "summary": ""
+    }
