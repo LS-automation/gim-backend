@@ -1,10 +1,13 @@
-import os
 import gspread
 from google.oauth2.service_account import Credentials
 from config import GOOGLE_SHEET_ID
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
+
+# ==============================
+# CONNECT TO GOOGLE SHEET
+# ==============================
 def connect_sheet():
     creds = Credentials.from_service_account_file(
         "database/credentials.json",
@@ -34,6 +37,25 @@ def get_active_companies():
             })
 
     return active_companies
+
+
+# ==============================
+# GET EXISTING SIGNAL URLS
+# (Prevents duplicates)
+# ==============================
+def get_existing_urls():
+    sheet = connect_sheet()
+    worksheet = sheet.worksheet("Signals")
+    records = worksheet.get_all_records()
+
+    existing_urls = set()
+
+    for row in records:
+        url = row.get("Source URL")
+        if url:
+            existing_urls.add(url)
+
+    return existing_urls
 
 
 # ==============================

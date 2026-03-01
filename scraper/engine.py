@@ -1,72 +1,66 @@
+from datetime import datetime
 from scraper.google import search_google
-from scraper.website import extract_content
-from ai.validator import validate_with_ai
 from database.db import (
     get_active_companies,
     get_existing_urls,
-    save_signals_batch,
-    log_message,
-    update_last_scanned_bulk
+    save_signal,
+    save_log,
 )
-from config import CONFIDENCE_THRESHOLD
-from datetime import datetime
+from ai.validator import validate_with_ai
+
 
 def run_engine():
 
-    log_message("Engine Started")
+    try:
+        companies = get_active_companies()
+        existing_urls = get_existing_urls()
 
-    companies = get_active_companies()
-    existing_urls = get_existing_urls()
+        for company in companies:
+            company_name = company["company_name"]
 
-    all_signals = []
-    scanned_companies = []
+            results = search_google(company_name)
 
-    for company_data in companies:
+            for article in results:
 
-        company = company_data["Company Name"]
-        scanned_companies.append(company)
+                if not article["link"]:
+                    continue
 
-        log_message(f"Scanning {company}")
+                # Skip duplicates
+                if article["link"] in existing_urls:
+                    continue
 
-        results = search_google(company)
+                ai_result = validate_with_ai(
+                    company_name,
+                    article["title"],
+                    article["snippet"]
+                )
 
-        for article in results:
+                if not ai_result["is_valid"]:
+                    continue
 
-            if article["link"] in existing_urls:
-                continue
+                signal_row = [
+                    company_name,
+                    article["title"],
+                    article["link"],
+                    article["date"],
+                    ai_result["event_type"],
+                    ai_result["confidence"],
+                    ai_result["summary"],
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "No"
+                ]
 
-            content = extract_content(article["link"])
-            if not content:
-                continue
+                save_signal(signal_row)
 
-            ai_result = validate_with_ai(company, content)
-            if not ai_result:
-                continue
+        save_log([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "SUCCESS",
+            "Engine run completed"
+        ])
 
-            if not ai_result["relevant"]:
-                continue
-
-            if float(ai_result["confidence"]) < CONFIDENCE_THRESHOLD:
-                continue
-
-            signal_row = [
-                company,
-                article["title"],
-                article["link"],
-                article.get("date", ""),
-                ai_result["event_type"],
-                float(ai_result["confidence"]),
-                ai_result["summary"],
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "No"
-            ]
-
-            all_signals.append(signal_row)
-
-    # 🔥 SAVE EVERYTHING AT ONCE
-    save_signals_batch(all_signals)
-
-    # 🔥 UPDATE LAST SCANNED ONCE
-    update_last_scanned_bulk(scanned_companies)
-
-    log_message("Engine Finished")
+    except Exception as e:
+        save_log([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ERROR",
+            str(e)
+        ])
