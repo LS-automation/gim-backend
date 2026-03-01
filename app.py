@@ -2,43 +2,47 @@ import streamlit as st
 from scraper.engine import run_engine
 from database.db import connect_sheet
 import pandas as pd
+from datetime import datetime, timedelta
 
+# =====================================
+# PAGE CONFIG (MUST BE FIRST)
+# =====================================
 st.set_page_config(layout="wide")
 
-# =============================
+# =====================================
 # CLEAN PREMIUM CSS
-# =============================
+# =====================================
 st.markdown("""
 <style>
+html, body, [data-testid="stAppViewContainer"] {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
 
-/* Page background spacing */
+[data-testid="stSidebar"] {
+    background-color: #f3f4f6 !important;
+}
+
+h1, h2, h3 {
+    color: #111827 !important;
+    font-weight: 600;
+}
+
 .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
 }
 
-/* Title */
-.main-title {
-    font-size: 32px;
-    font-weight: 700;
-    color: #111827;
+.stButton>button {
+    background-color: #111827;
+    color: white;
+    border-radius: 6px;
 }
 
-.subtitle {
-    font-size: 14px;
-    color: #6b7280;
-    margin-bottom: 20px;
+.stButton>button:hover {
+    background-color: #1f2937;
 }
 
-/* Metric cards */
-[data-testid="metric-container"] {
-    background-color: #ffffff;
-    border-radius: 10px;
-    padding: 18px;
-    border: 1px solid #e5e7eb;
-}
-
-/* Signal cards */
 .signal-card {
     background-color: #ffffff;
     border-radius: 10px;
@@ -47,7 +51,6 @@ st.markdown("""
     margin-bottom: 15px;
 }
 
-/* Impact badges */
 .badge-high {
     background-color: #dcfce7;
     color: #166534;
@@ -71,15 +74,14 @@ st.markdown("""
     border-radius: 6px;
     font-size: 11px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
-# =============================
+# =====================================
 # HEADER
-# =============================
-st.markdown("<div class='main-title'>Growth Intelligence Monitor</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Corporate Event Intelligence Platform</div>", unsafe_allow_html=True)
+# =====================================
+st.markdown("<h1>Growth Intelligence Monitor</h1>", unsafe_allow_html=True)
+st.caption("Corporate Event Intelligence Platform")
 
 col1, col2 = st.columns([1,5])
 
@@ -90,9 +92,9 @@ with col1:
 
 st.divider()
 
-# =============================
+# =====================================
 # LOAD DATA
-# =============================
+# =====================================
 sheet = connect_sheet()
 signals_data = sheet.worksheet("Signals").get_all_records()
 signals_df = pd.DataFrame(signals_data)
@@ -101,13 +103,29 @@ if signals_df.empty:
     st.warning("No signals available.")
     st.stop()
 
-# =============================
+# Convert types safely
+signals_df["AI Confidence"] = pd.to_numeric(signals_df["AI Confidence"], errors="coerce")
+signals_df["Detection Timestamp"] = pd.to_datetime(
+    signals_df["Detection Timestamp"], errors="coerce"
+)
+
+# =====================================
+# FILTER LAST 24 HOURS (CRITICAL)
+# =====================================
+last_24h = datetime.utcnow() - timedelta(days=1)
+signals_df = signals_df[signals_df["Detection Timestamp"] >= last_24h]
+
+if signals_df.empty:
+    st.info("No signals detected in the last 24 hours.")
+    st.stop()
+
+# =====================================
 # SIDEBAR FILTERS
-# =============================
+# =====================================
 st.sidebar.markdown("### Filters")
 
-companies = signals_df["Company Name"].unique()
-event_types = signals_df["Event Type"].unique()
+companies = signals_df["Company Name"].dropna().unique()
+event_types = signals_df["Event Type"].dropna().unique()
 
 selected_company = st.sidebar.selectbox("Company", ["All"] + list(companies))
 selected_type = st.sidebar.selectbox("Event Type", ["All"] + list(event_types))
@@ -123,10 +141,13 @@ if selected_type != "All":
 
 filtered_df = filtered_df[filtered_df["AI Confidence"] >= confidence_filter]
 
-# =============================
+# Sort newest first
+filtered_df = filtered_df.sort_values("Detection Timestamp", ascending=False)
+
+# =====================================
 # EXECUTIVE OVERVIEW
-# =============================
-st.markdown("### Overview")
+# =====================================
+st.markdown("### Overview (Last 24 Hours)")
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -137,9 +158,9 @@ col4.metric("Leadership", len(filtered_df[filtered_df["Event Type"] == "Leadersh
 
 st.divider()
 
-# =============================
+# =====================================
 # SIGNAL CARDS
-# =============================
+# =====================================
 st.markdown("### Signals")
 
 for _, row in filtered_df.iterrows():

@@ -6,10 +6,12 @@ def search_google(company_name):
     query = f"{company_name} leadership OR funding OR acquisition OR merger OR expansion OR tender news"
 
     params = {
-        "engine": "google",
-        "q": query,
-        "api_key": SERPAPI_KEY,
-        "num": MAX_RESULTS_PER_COMPANY,
+    "q": query,
+    "api_key": SERPAPI_KEY,
+    "engine": "google",
+    "tbm": "nws",
+    "num": MAX_RESULTS_PER_COMPANY,
+    "tbs": "qdr:d"  # past 24 hours only
     }
 
     search = GoogleSearch(params)
