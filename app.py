@@ -3,6 +3,7 @@ from scraper.engine import run_engine
 from database.db import connect_sheet
 import pandas as pd
 from datetime import datetime, timedelta
+import re
 
 # =====================================
 # PAGE CONFIG (MUST BE FIRST)
@@ -49,6 +50,10 @@ h1, h2, h3 {
     padding: 18px;
     border: 1px solid #e5e7eb;
     margin-bottom: 15px;
+}
+
+.signal-card div {
+    color: #111827 !important;
 }
 
 .badge-high {
@@ -110,7 +115,7 @@ signals_df["Detection Timestamp"] = pd.to_datetime(
 )
 
 # =====================================
-# FILTER LAST 24 HOURS (CRITICAL)
+# FILTER LAST 24 HOURS
 # =====================================
 last_24h = datetime.utcnow() - timedelta(days=1)
 signals_df = signals_df[signals_df["Detection Timestamp"] >= last_24h]
@@ -177,6 +182,9 @@ for _, row in filtered_df.iterrows():
         badge_class = "badge-low"
         impact_label = "Low Impact"
 
+    # Remove HTML tags from summary
+    clean_summary = re.sub('<.*?>', '', str(row["Event Summary"]))
+
     st.markdown(f"""
     <div class="signal-card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -188,11 +196,11 @@ for _, row in filtered_df.iterrows():
             {row['Event Type']}
         </div>
 
-        <div style="margin-top:10px; color:#374151;">
-            {row['Event Summary']}
+        <div style="margin-top:10px;">
+            {clean_summary}
         </div>
 
-        <div style="margin-top:12px; font-size:12px; color:#9ca3af;">
+        <div style="margin-top:12px; font-size:12px; color:#6b7280;">
             Detected: {row['Detection Timestamp']}
         </div>
 
