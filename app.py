@@ -3,57 +3,85 @@ from scraper.engine import run_engine
 from database.db import connect_sheet
 import pandas as pd
 from datetime import datetime, timedelta
-import re
 
-# =====================================
-# PAGE CONFIG (MUST BE FIRST)
-# =====================================
 st.set_page_config(layout="wide")
 
-# =====================================
-# CLEAN PREMIUM CSS
-# =====================================
+# =============================
+# CLEAN WHITE EXECUTIVE THEME
+# =============================
 st.markdown("""
 <style>
+
+/* Remove dark header */
+header {visibility: hidden;}
+footer {visibility: hidden;}
+
+/* White background */
 html, body, [data-testid="stAppViewContainer"] {
     background-color: #ffffff !important;
     color: #111827 !important;
 }
 
+/* Sidebar fix */
 [data-testid="stSidebar"] {
     background-color: #f3f4f6 !important;
 }
 
-h1, h2, h3 {
+[data-testid="stSidebar"] * {
     color: #111827 !important;
-    font-weight: 600;
 }
 
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
+/* Title */
+.main-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #111827;
 }
 
-.stButton>button {
-    background-color: #111827;
-    color: white;
-    border-radius: 6px;
+.subtitle {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 20px;
 }
 
-.stButton>button:hover {
-    background-color: #1f2937;
-}
-
-.signal-card {
+/* Metric cards */
+[data-testid="metric-container"] {
     background-color: #ffffff;
     border-radius: 10px;
     padding: 18px;
     border: 1px solid #e5e7eb;
+}
+
+/* Signal card */
+.signal-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
     margin-bottom: 15px;
 }
 
-.signal-card div {
-    color: #111827 !important;
+.signal-title {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 5px;
+}
+
+.signal-type {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 10px;
+}
+
+.signal-summary {
+    font-size: 14px;
+    color: #111827;
+    margin-bottom: 8px;
+}
+
+.signal-meta {
+    font-size: 12px;
+    color: #6b7280;
 }
 
 .badge-high {
@@ -79,36 +107,33 @@ h1, h2, h3 {
     border-radius: 6px;
     font-size: 11px;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
-# =====================================
+# =============================
 # HEADER
-# =====================================
-# =====================================
-# LOGO + HEADER ROW
-# =====================================
+# =============================
+
 col_logo, col_title = st.columns([1,6])
 
 with col_logo:
-    st.image("assets/logo.png", width=120)
+    st.image("assets/logo.png", width=100)
 
 with col_title:
-    st.markdown("<h1 style='margin-bottom:0;'>Growth Intelligence Monitor</h1>", unsafe_allow_html=True)
-    st.caption("Corporate Event Intelligence Platform")
-    
-col1, col2 = st.columns([1,5])
+    st.markdown("<div class='main-title'>Growth Intelligence Monitor</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Corporate Event Intelligence Platform</div>", unsafe_allow_html=True)
 
-with col1:
-    if st.button("Run Scan"):
-        run_engine()
-        st.success("Scan Completed")
+if st.button("Run Scan"):
+    run_engine()
+    st.success("Scan Completed")
 
 st.divider()
 
-# =====================================
+# =============================
 # LOAD DATA
-# =====================================
+# =============================
+
 sheet = connect_sheet()
 signals_data = sheet.worksheet("Signals").get_all_records()
 signals_df = pd.DataFrame(signals_data)
@@ -117,29 +142,22 @@ if signals_df.empty:
     st.warning("No signals available.")
     st.stop()
 
-# Convert types safely
-signals_df["AI Confidence"] = pd.to_numeric(signals_df["AI Confidence"], errors="coerce")
-signals_df["Detection Timestamp"] = pd.to_datetime(
-    signals_df["Detection Timestamp"], errors="coerce"
-)
+# Convert timestamp properly
+signals_df["Detection Timestamp"] = pd.to_datetime(signals_df["Detection Timestamp"], errors="coerce")
 
-# =====================================
-# FILTER LAST 24 HOURS
-# =====================================
-last_24h = datetime.utcnow() - timedelta(days=1)
+# Only last 24 hours
+now = datetime.utcnow()
+last_24h = now - timedelta(hours=24)
 signals_df = signals_df[signals_df["Detection Timestamp"] >= last_24h]
 
-if signals_df.empty:
-    st.info("No signals detected in the last 24 hours.")
-    st.stop()
-
-# =====================================
+# =============================
 # SIDEBAR FILTERS
-# =====================================
+# =============================
+
 st.sidebar.markdown("### Filters")
 
-companies = signals_df["Company Name"].dropna().unique()
-event_types = signals_df["Event Type"].dropna().unique()
+companies = signals_df["Company Name"].unique()
+event_types = signals_df["Event Type"].unique()
 
 selected_company = st.sidebar.selectbox("Company", ["All"] + list(companies))
 selected_type = st.sidebar.selectbox("Event Type", ["All"] + list(event_types))
@@ -155,12 +173,16 @@ if selected_type != "All":
 
 filtered_df = filtered_df[filtered_df["AI Confidence"] >= confidence_filter]
 
-# Sort newest first
-filtered_df = filtered_df.sort_values("Detection Timestamp", ascending=False)
+# Sort by confidence then time
+filtered_df = filtered_df.sort_values(
+    by=["AI Confidence", "Detection Timestamp"],
+    ascending=[False, False]
+)
 
-# =====================================
+# =============================
 # EXECUTIVE OVERVIEW
-# =====================================
+# =============================
+
 st.markdown("### Overview (Last 24 Hours)")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -172,9 +194,10 @@ col4.metric("Leadership", len(filtered_df[filtered_df["Event Type"] == "Leadersh
 
 st.divider()
 
-# =====================================
-# SIGNAL CARDS
-# =====================================
+# =============================
+# SIGNALS
+# =============================
+
 st.markdown("### Signals")
 
 for _, row in filtered_df.iterrows():
@@ -191,31 +214,27 @@ for _, row in filtered_df.iterrows():
         badge_class = "badge-low"
         impact_label = "Low Impact"
 
-    # Remove HTML tags from summary
-    clean_summary = re.sub('<.*?>', '', str(row["Event Summary"]))
-
     st.markdown(f"""
     <div class="signal-card">
+
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong>{row['Company Name']}</strong>
+            <div class="signal-title">{row['Company Name']}</div>
             <span class="{badge_class}">{impact_label}</span>
         </div>
 
-        <div style="margin-top:6px; font-size:13px; color:#6b7280;">
+        <div class="signal-type">
             {row['Event Type']}
         </div>
 
-        <div style="margin-top:10px;">
-            {clean_summary}
+        <div class="signal-summary">
+            {row['Event Summary']}
         </div>
 
-        <div style="margin-top:12px; font-size:12px; color:#6b7280;">
-            Detected: {row['Detection Timestamp']}
-        </div>
-
-        <div style="margin-top:8px;">
+        <div class="signal-meta">
+            Detected: {row['Detection Timestamp']} |
             <a href="{row['Source URL']}" target="_blank">View Source</a>
         </div>
+
     </div>
     """, unsafe_allow_html=True)
 
