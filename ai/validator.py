@@ -3,18 +3,12 @@ import json
 from config import GROQ_API_KEY
 
 
-def validate_with_ai(company, title, snippet):
-
-    if not GROQ_API_KEY:
-        return {
-            "is_valid": False,
-            "event_type": "",
-            "confidence": 0.0,
-            "summary": ""
-        }
+def validate_with_ai(company, title, snippet, content):
 
     prompt = f"""
-Return ONLY valid JSON.
+You are a corporate intelligence analyst.
+
+Return ONLY valid JSON in this exact structure:
 
 {{
 "relevant": true/false,
@@ -33,21 +27,27 @@ Leadership Appointment
 Leadership Interview
 Tender
 
-STRICT RULES:
-1. Only mark relevant=true if this article announces a NEW, concrete company action.
-2. Ignore stock price commentary.
-3. Ignore analyst opinions.
-4. Ignore shareholder filings.
-5. Ignore financial audit commentary.
-6. Ignore market speculation.
-7. Ignore general strategy discussion.
-8. If unsure → relevant=false.
-9. Do NOT guess.
+Strict Rules:
 
-Article Title: {title}
+1. Only mark relevant=true if this article announces a NEW, concrete corporate action.
+2. Ignore:
+   - Stock price commentary
+   - Analyst opinions
+   - Market speculation
+   - Financial audits
+   - General business commentary
+   - Shareholder filings
+3. The action must be officially announced.
+4. If unsure → relevant=false.
+5. Summary must be plain text only.
+6. Summary must be one short executive sentence.
+7. Do NOT include HTML or formatting.
+8. Do NOT guess.
 
-Article Snippet:
-{snippet}
+Article Information:
+Title: {title}
+Snippet: {snippet}
+Content: {content[:2000]}
 """
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -73,22 +73,15 @@ Article Snippet:
         response = requests.post(url, json=payload, headers=headers, timeout=20)
 
         if response.status_code == 200:
-            ai_response = response.json()["choices"][0]["message"]["content"]
-            parsed = json.loads(ai_response)
+            result = json.loads(response.json()["choices"][0]["message"]["content"])
 
-            return {
-                "is_valid": parsed.get("relevant", False),
-                "event_type": parsed.get("event_type", ""),
-                "confidence": parsed.get("confidence", 0.0),
-                "summary": parsed.get("summary", "")
-            }
+            # Safety fallback
+            if "relevant" not in result:
+                return None
+
+            return result
 
     except Exception as e:
         print("Groq API error:", e)
 
-    return {
-        "is_valid": False,
-        "event_type": "",
-        "confidence": 0.0,
-        "summary": ""
-    }
+    return None
