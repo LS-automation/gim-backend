@@ -85,9 +85,18 @@ h1, h2, h3 {
 # =====================================
 # HEADER
 # =====================================
-st.markdown("<h1>Growth Intelligence Monitor</h1>", unsafe_allow_html=True)
-st.caption("Corporate Event Intelligence Platform")
+# =====================================
+# LOGO + HEADER ROW
+# =====================================
+col_logo, col_title = st.columns([1,6])
 
+with col_logo:
+    st.image("assets/logo.png", width=120)
+
+with col_title:
+    st.markdown("<h1 style='margin-bottom:0;'>Growth Intelligence Monitor</h1>", unsafe_allow_html=True)
+    st.caption("Corporate Event Intelligence Platform")
+    
 col1, col2 = st.columns([1,5])
 
 with col1:
